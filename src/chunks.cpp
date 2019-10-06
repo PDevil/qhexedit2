@@ -74,7 +74,7 @@ QByteArray Chunks::data(qint64 pos, qint64 maxSize, QByteArray *highlighted)
         while ((chunkIdx < _chunks.count()) && chunksLoopOngoing)
         {
             // In this section, we track changes before our required data and
-            // we take the editdet data, if availible. ioDelta is a difference
+            // we take the edited data, if availible. ioDelta is a difference
             // counter to justify the read pointer to the original data, if
             // data in between was deleted or inserted.
 

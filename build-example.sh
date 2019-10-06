@@ -5,6 +5,6 @@ else
 fi
 
 cd build
-qmake ../example/qhexedit.pro
+qmake -tp vc ../example/qhexedit.pro
 make
 cd ..

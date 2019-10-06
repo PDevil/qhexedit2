@@ -2,6 +2,7 @@
 #include <QIcon>
 
 #include "mainwindow.h"
+#include <testwindow.h>
 
 int main(int argc, char *argv[])
 {
@@ -17,8 +18,13 @@ int main(int argc, char *argv[])
     translator.load(QString("qhexedit_") + locale);
     app.installTranslator(&translator);
 
-    MainWindow *mainWin = new MainWindow;
-    mainWin->show();
+#if 1
+	MainWindow *mainWin = new MainWindow;
+	mainWin->show();
+
+	TestWindow* testWnd = new TestWindow();
+	testWnd->show();
+#endif
 
     return app.exec();
 }

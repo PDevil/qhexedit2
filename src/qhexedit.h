@@ -362,17 +362,18 @@ private slots:
 
 private:
     // Name convention: pixel positions start with _px
-    int _pxCharWidth, _pxCharHeight;            // char dimensions (dependend on font)
-    int _pxPosHexX;                             // X-Pos of HeaxArea
-    int _pxPosAdrX;                             // X-Pos of Address Area
-    int _pxPosAsciiX;                           // X-Pos of Ascii Area
-    int _pxGapAdr;                              // gap left from AddressArea
-    int _pxGapAdrHex;                           // gap between AddressArea and HexAerea
-    int _pxGapHexAscii;                         // gap between HexArea and AsciiArea
-    int _pxCursorWidth;                         // cursor width
-    int _pxSelectionSub;                        // offset selection rect
-    int _pxCursorX;                             // current cursor pos
-    int _pxCursorY;                             // current cursor pos
+	int _pxCharWidth;		// Character width on screen
+	int _pxCharHeight;      // Character height on screen
+    int _pxPosAddrWidth;	// Width of Address Area box (read-only, changed during painting)
+    int _pxPosAddrX;		// Starting X position of Address Area (read-only, changed during painting)
+    int _pxPosAsciiX;		// Starting X position of Ascii Area (read-only, changed during adjust())
+    int _pxGapAdr;			// Left margin size of AddressArea
+    int _pxGapAdrHex;		// Gap between AddressArea and HexAerea
+    int _pxGapHexAscii;		// Gap between HexArea and AsciiArea
+    int _pxCursorWidth;		// cursor width
+    int _pxSelectionSub;	// offset selection rect
+    int _pxCursorX;			// current cursor pos
+    int _pxCursorY;			// current cursor pos
 
     // Name convention: absolute byte positions in chunks start with _b
     qint64 _bSelectionBegin;                    // first position of Selection

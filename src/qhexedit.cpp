@@ -140,7 +140,7 @@ bool QHexEdit::asciiArea()
 void QHexEdit::setBytesPerLine(int count)
 {
     _bytesPerLine = count;
-    _hexCharsInLine = count * 3 - 1;
+    _hexCharsInLine = count * 3 - 1; // hex characters in line = ascii bytes * (byte representation + space) - (1 space)
 
     adjust();
     setCursorPosition(_cursorPosition);
@@ -174,7 +174,7 @@ void QHexEdit::setCursorPosition(qint64 position)
         _pxCursorX = x / 2 * _pxCharWidth + _pxPosAsciiX;
         _cursorPosition = position & 0xFFFFFFFFFFFFFFFE;
     } else {
-        _pxCursorX = (((x / 2) * 3) + (x % 2)) * _pxCharWidth + _pxPosHexX;
+        _pxCursorX = (((x / 2) * 3) + (x % 2)) * _pxCharWidth + _pxPosAddrWidth;
         _cursorPosition = position;
     }
 
@@ -193,24 +193,28 @@ qint64 QHexEdit::cursorPosition(QPoint pos)
 {
     // Calc cursor position depending on a graphical position
     qint64 result = -1;
-    int posX = pos.x() + horizontalScrollBar()->value();
-    int posY = pos.y() - 3;
-    if ((posX >= _pxPosHexX) && (posX < (_pxPosHexX + (1 + _hexCharsInLine) * _pxCharWidth)))
+    int posX = pos.x() + horizontalScrollBar()->value(); // current pos + horizontal scrollbar value as horizontal offset
+	// TODO: get to know what 3 means
+    int posY = pos.y() - 3; // current pos - magic number?
+    if ((posX >= _pxPosAddrWidth) && // cursor must be outside Address Area box
+		(posX < (_pxPosAddrWidth + (1 + _hexCharsInLine) * _pxCharWidth))) // cursor must be inside Hex box
     {
         _editAreaIsAscii = false;
-        int x = (posX - _pxPosHexX) / _pxCharWidth;
+        int x = (posX - _pxPosAddrWidth) / _pxCharWidth;
         x = (x / 3) * 2 + x % 3;
         int y = (posY / _pxCharHeight) * 2 * _bytesPerLine;
         result = _bPosFirst * 2 + x + y;
     }
-    else
-        if (_asciiArea && (posX >= _pxPosAsciiX) && (posX < (_pxPosAsciiX + (1 + _bytesPerLine) * _pxCharWidth)))
-        {
-            _editAreaIsAscii = true;
-            int x = 2 * (posX - _pxPosAsciiX) / _pxCharWidth;
-            int y = (posY / _pxCharHeight) * 2 * _bytesPerLine;
-            result = _bPosFirst * 2 + x + y;
-        }
+	else
+	{
+		if (_asciiArea && (posX >= _pxPosAsciiX) && (posX < (_pxPosAsciiX + (1 + _bytesPerLine) * _pxCharWidth)))
+		{
+			_editAreaIsAscii = true;
+			int x = 2 * (posX - _pxPosAsciiX) / _pxCharWidth;
+			int y = (posY / _pxCharHeight) * 2 * _bytesPerLine;
+			result = _bPosFirst * 2 + x + y;
+		}
+	}
     return result;
 }
 
@@ -835,8 +839,10 @@ void QHexEdit::paintEvent(QPaintEvent *event)
 
         // draw some patterns if needed
         painter.fillRect(event->rect(), viewport()->palette().color(QPalette::Base));
-        if (_addressArea)
-            painter.fillRect(QRect(-pxOfsX, event->rect().top(), _pxPosHexX - _pxGapAdrHex/2, height()), _addressAreaColor);
+		if (_addressArea)
+		{
+			painter.fillRect(QRect(-pxOfsX, event->rect().top(), _pxPosAddrWidth - _pxGapAdrHex / 2, height()), _addressAreaColor);
+		}
         if (_asciiArea)
         {
             int linePos = _pxPosAsciiX - (_pxGapHexAscii / 2);
@@ -853,7 +859,8 @@ void QHexEdit::paintEvent(QPaintEvent *event)
             for (int row=0, pxPosY = _pxCharHeight; row <= (_dataShown.size()/_bytesPerLine); row++, pxPosY +=_pxCharHeight)
             {
                 address = QString("%1").arg(_bPosFirst + row*_bytesPerLine + _addressOffset, _addrDigits, 16, QChar('0'));
-                painter.drawText(_pxPosAdrX - pxOfsX, pxPosY, address);
+				painter.drawLine(0, pxPosY, 500, pxPosY);
+                painter.drawText(_pxPosAddrX - pxOfsX, pxPosY, address);
             }
         }
 
@@ -865,7 +872,7 @@ void QHexEdit::paintEvent(QPaintEvent *event)
         for (int row = 0, pxPosY = pxPosStartY; row <= _rowsShown; row++, pxPosY +=_pxCharHeight)
         {
             QByteArray hex;
-            int pxPosX = _pxPosHexX  - pxOfsX;
+            int pxPosX = _pxPosAddrWidth  - pxOfsX;
             int pxPosAsciiX2 = _pxPosAsciiX  - pxOfsX;
             qint64 bPosLine = row * _bytesPerLine;
             for (int colIdx = 0; ((bPosLine + colIdx) < _dataShown.size() && (colIdx < _bytesPerLine)); colIdx++)
@@ -923,32 +930,32 @@ void QHexEdit::paintEvent(QPaintEvent *event)
     // due to scrolling the cursor can go out of the currently displayed data
     if ((hexPositionInShowData >= 0) && (hexPositionInShowData < _hexDataShown.size()))
     {
-            // paint cursor
-            if (_readOnly)
-            {
-                // make the background stick out
-                QColor color = viewport()->palette().dark().color();
-                painter.fillRect(QRect(_pxCursorX - pxOfsX, _pxCursorY - _pxCharHeight + _pxSelectionSub, _pxCharWidth, _pxCharHeight), color);
-            }
-            else
-            {
-                if (_blink && hasFocus())
-                    painter.fillRect(_cursorRect, this->palette().color(QPalette::WindowText));
-            }
+        // paint cursor
+        if (_readOnly)
+        {
+            // make the background stick out
+            QColor color = viewport()->palette().dark().color();
+            painter.fillRect(QRect(_pxCursorX - pxOfsX, _pxCursorY - _pxCharHeight + _pxSelectionSub, _pxCharWidth, _pxCharHeight), color);
+        }
+        else
+        {
+            if (_blink && hasFocus())
+                painter.fillRect(_cursorRect, this->palette().color(QPalette::WindowText));
+        }
 
-            if (_editAreaIsAscii)
-            {
-                // every 2 hex there is 1 ascii
-                int asciiPositionInShowData = hexPositionInShowData / 2;
-                int ch = (uchar)_dataShown.at(asciiPositionInShowData);
-                if (ch < ' ' || ch > '~')
-                    ch = '.';
-                painter.drawText(_pxCursorX - pxOfsX, _pxCursorY, QChar(ch));
-            }
-            else
-            {
-                painter.drawText(_pxCursorX - pxOfsX, _pxCursorY, _hexDataShown.mid(hexPositionInShowData, 1));
-            }
+        if (_editAreaIsAscii)
+        {
+            // every 2 hex there is 1 ascii
+            int asciiPositionInShowData = hexPositionInShowData / 2;
+            int ch = (uchar)_dataShown.at(asciiPositionInShowData);
+            if (ch < ' ' || ch > '~')
+                ch = '.';
+            painter.drawText(_pxCursorX - pxOfsX, _pxCursorY, QChar(ch));
+        }
+        else
+        {
+            painter.drawText(_pxCursorX - pxOfsX, _pxCursorY, _hexDataShown.mid(hexPositionInShowData, 1));
+        }
     }
 
     // emit event, if size has changed
@@ -966,7 +973,7 @@ void QHexEdit::resizeEvent(QResizeEvent *)
         int pxFixGaps = 0;
         if (_addressArea)
             pxFixGaps = addressWidth() * _pxCharWidth + _pxGapAdr;
-        pxFixGaps += _pxGapAdrHex;
+        pxFixGaps += _pxGapAdrHex; //dynamic bytes
         if (_asciiArea)
             pxFixGaps += _pxGapHexAscii;
 
@@ -1062,18 +1069,24 @@ void QHexEdit::adjust()
     if (_addressArea)
     {
         _addrDigits = addressWidth();
-        _pxPosHexX = _pxGapAdr + _addrDigits*_pxCharWidth + _pxGapAdrHex;
+		// Left margin of Address Area + (number of address digits * width of character in font) + gap between last address area char and first hex char
+		_pxPosAddrWidth = _pxGapAdr + _addrDigits * _pxCharWidth + _pxGapAdrHex;
     }
-    else
-        _pxPosHexX = _pxGapAdrHex;
-    _pxPosAdrX = _pxGapAdr;
-    _pxPosAsciiX = _pxPosHexX + _hexCharsInLine * _pxCharWidth + _pxGapHexAscii;
+	else
+	{
+		// If address area is off, then the starting pos of hex box is equal to gap between Address Area and Hex Area
+        _pxPosAddrWidth = _pxGapAdrHex;
+	}
+    _pxPosAddrX = _pxGapAdr; // r/o
+	// Starting X position of ascii area = Address Area Box width + (characters in hex in line * character width) + 
+    _pxPosAsciiX = _pxPosAddrWidth + _hexCharsInLine * _pxCharWidth + _pxGapHexAscii; // r/o
 
     // set horizontalScrollBar()
     int pxWidth = _pxPosAsciiX;
     if (_asciiArea)
         pxWidth += _bytesPerLine*_pxCharWidth;
     horizontalScrollBar()->setRange(0, pxWidth - viewport()->width());
+	auto c = viewport()->width();
     horizontalScrollBar()->setPageStep(viewport()->width());
 
     // set verticalScrollbar()
