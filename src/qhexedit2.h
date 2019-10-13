@@ -238,7 +238,7 @@ private:
 
 	// Other functions
 	void readBuffers();
-	void recalculateMetrics();
+	void recalculateMetricVariables();
 	void recalculateOverallWidth();
 	QString formatAddress(int address);
 

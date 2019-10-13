@@ -123,7 +123,7 @@ int QHexEdit2::addressWidth()
 void QHexEdit2::setAddressWidth(int addressWidth)
 {
 	_addressWidth = addressWidth;
-	recalculateMetrics();
+	recalculateMetricVariables();
 	recalculateOverallWidth();
 	setCursorPosition(_cursorPosition);
 	viewport()->update();
@@ -161,7 +161,7 @@ int QHexEdit2::bytesPerLine()
 void QHexEdit2::setBytesPerLine(int count)
 {
 	_bytesPerLine = count;
-	recalculateMetrics();
+	recalculateMetricVariables();
 	recalculateOverallWidth();
 	onResizeReposition();
 	setCursorPosition(_cursorPosition);
@@ -298,7 +298,7 @@ void QHexEdit2::setFont(const QFont& font)
 {
 	QWidget::setFont(font);
 
-	recalculateMetrics();
+	recalculateMetricVariables();
 	recalculateOverallWidth();
 	onResizeReposition();
 	viewport()->update();
@@ -451,8 +451,8 @@ void QHexEdit2::onResizeReposition()
 		_byteLastShown = newByteLastShown;
 
 		int rowsOverall = _chunks->size() / bytesPerLine() + 1;
-		verticalScrollBar()->setRange(0, rowsOverall - _rowsCanShowOnScreen);
-		verticalScrollBar()->setPageStep(_rowsCanShowOnScreen);
+		verticalScrollBar()->setRange(0, 8);
+		verticalScrollBar()->setPageStep(1);
 
 		readBuffers();
 	}
@@ -470,7 +470,7 @@ void QHexEdit2::readBuffers()
 	_hexDataShown = _dataShown.toHex();
 }
 
-void QHexEdit2::recalculateMetrics()
+void QHexEdit2::recalculateMetricVariables()
 {
 	QFontMetrics metrics(font());
 
