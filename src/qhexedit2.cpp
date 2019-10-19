@@ -3,6 +3,8 @@
 #include <qpainter.h>
 #include <qscrollbar.h>
 #include <qrect.h>
+#include <qevent.h>
+#include <qpixmap.h>
 
 QHexEdit2::QHexEdit2(QWidget* parent) : QAbstractScrollArea(parent)
 {
@@ -21,8 +23,9 @@ QHexEdit2::QHexEdit2(QWidget* parent) : QAbstractScrollArea(parent)
 	_readOnly = false;
 
 	_chunks = new Chunks(this);
-	_byteFirstShown = 0;
-	_byteLastShown = 0;
+	_firstLine = 0;
+	_allLines = 0;
+	_linesToShow = 0;
 
 	setFont(QFont("Consolas", 10));
 
@@ -37,7 +40,7 @@ QHexEdit2::~QHexEdit2()
 bool QHexEdit2::setData(QIODevice& iODevice)
 {
 	bool ok = _chunks->setIODevice(iODevice);
-	onSourceChanged();
+	this->onSourceChanged();
 	return ok;
 }
 
@@ -123,9 +126,8 @@ int QHexEdit2::addressWidth()
 void QHexEdit2::setAddressWidth(int addressWidth)
 {
 	_addressWidth = addressWidth;
-	recalculateMetricVariables();
-	recalculateOverallWidth();
-	setCursorPosition(_cursorPosition);
+	this->recalculateMetricVariables();
+	this->setCursorPosition(_cursorPosition);
 	viewport()->update();
 }
 
@@ -137,8 +139,8 @@ bool QHexEdit2::asciiArea()
 void QHexEdit2::setAsciiArea(bool asciiArea)
 {
 	_asciiArea = asciiArea;
-	recalculateOverallWidth();
-	setCursorPosition(_cursorPosition);
+	this->recalculateOverallWidth();
+	this->setCursorPosition(_cursorPosition);
 	viewport()->update();
 }
 
@@ -161,9 +163,8 @@ int QHexEdit2::bytesPerLine()
 void QHexEdit2::setBytesPerLine(int count)
 {
 	_bytesPerLine = count;
-	recalculateMetricVariables();
-	recalculateOverallWidth();
-	onResizeReposition();
+	this->recalculateMetricVariables();
+	this->onResizeReposition();
 	setCursorPosition(_cursorPosition);
 	viewport()->update();
 }
@@ -209,7 +210,6 @@ void QHexEdit2::setCursorPosition(qint64 position)
 	// 4. Immediately draw new cursor
 	_blink = true;
 	viewport()->update(_cursorRect);*/
-	//emit currentAddressChanged(_bPosCurrent);
 }
 
 QByteArray QHexEdit2::data()
@@ -219,11 +219,8 @@ QByteArray QHexEdit2::data()
 
 void QHexEdit2::setData(const QByteArray& ba)
 {
-	//_data = ba;
-	_bufData.setData(ba);
-	setData(_bufData);
-	//_bData.setData(_data);
-	//setData(_bData);
+	_buffer.setData(ba);
+	setData(_buffer);
 }
 
 bool QHexEdit2::overwriteMode()
@@ -234,7 +231,6 @@ bool QHexEdit2::overwriteMode()
 void QHexEdit2::setOverwriteMode(bool overwriteMode)
 {
 	_overwriteMode = overwriteMode;
-	emit overwriteModeChanged(overwriteMode);
 }
 
 bool QHexEdit2::isReadOnly()
@@ -315,8 +311,46 @@ void QHexEdit2::mouseMoveEvent(QMouseEvent* event)
 {
 }
 
-void QHexEdit2::mousePressEvent(QMouseEvent* event)
+void QHexEdit2::mousePressEvent(QMouseEvent* e)
 {
+	QPoint pos = e->pos();
+	pos += QPoint(horizontalScrollBar()->value(), 0);
+	if (hexArea() && !addressArea() || (addressArea() && pos.x() > _size_Width_AddressAreaBox))
+	{
+		if (addressArea())
+		{
+			pos -= QPoint(_size_Width_AddressAreaBox, 0);
+		}
+
+		int singleByteWidth = _size_Width_BreakpointField + _size_Width_HexAreaField;
+		int byteXPos = pos.x() / singleByteWidth;
+		int byteIndex =
+			(_firstLine * this->bytesPerLine()) + // starting line
+			(pos.y() / _size_Height_SingleLine * this->bytesPerLine()) + // lines above cursor
+			(byteXPos); // current line
+
+		if (byteIndex < _chunks->size() && pos.x() % singleByteWidth < _size_Width_BreakpointField)
+		{
+			emit onBreakpointClick(byteIndex);
+			/*if (_breakpoints[byteIndex] == BreakpointType::None)
+			{
+				_breakpoints[byteIndex] = BreakpointType::Read;
+			}
+			else if (_breakpoints[byteIndex] == BreakpointType::Read)
+			{
+				_breakpoints[byteIndex] = BreakpointType::Write;
+			}
+			else if (_breakpoints[byteIndex] == BreakpointType::Write)
+			{
+				_breakpoints[byteIndex] = BreakpointType::ReadWrite;
+			}
+			else
+			{
+				_breakpoints[byteIndex] = BreakpointType::None;
+			}*/
+			viewport()->update();
+		}
+	}
 }
 
 void QHexEdit2::paintEvent(QPaintEvent* event)
@@ -337,10 +371,10 @@ void QHexEdit2::paintEvent(QPaintEvent* event)
 
 		painter.setPen(addressAreaFontColor());
 		addressAreaBox.setRect(x + _margin_left_AddressAreaField, 0, _size_Width_AddressAreaBox, _size_Height_SingleLine);
-		for (int row = 0, pxPosY = 0; row < this->_rowsShown; ++row, pxPosY += _size_Height_SingleLine)
+		for (int row = 0, pxPosY = 0; row < this->_linesToShow; ++row, pxPosY += _size_Height_SingleLine)
 		{
 			addressAreaBox.moveTop(pxPosY);
-			painter.drawText(addressAreaBox, Qt::AlignLeft | Qt::AlignVCenter, formatAddress(_byteFirstShown + row * bytesPerLine() + addressOffset()));
+			painter.drawText(addressAreaBox, Qt::AlignLeft | Qt::AlignVCenter, formatAddress((_firstLine + row) * bytesPerLine() + addressOffset()));
 		}
 
 		Xcurrent += _size_Width_AddressAreaBox;
@@ -353,19 +387,43 @@ void QHexEdit2::paintEvent(QPaintEvent* event)
 		QRect box;
 		box.setRect(0, 0, _size_Width_HexAreaField, _size_Height_SingleLine);
 		painter.setPen(Qt::white);
-		for (int row = 0, pxPosY = 0; row < this->_rowsShown; ++row, pxPosY += _size_Height_SingleLine)
+		int relBytePos = 0;
+		int absBytePos = _firstLine * this->bytesPerLine();
+		for (int row = 0, pxPosY = 0; row < this->_linesToShow; ++row, pxPosY += _size_Height_SingleLine)
 		{
 			box.moveTop(pxPosY);
-			for (int col = 0, bytePos = row * bytesPerLine(), x_pos = x;
-				col < bytesPerLine() && bytePos < _dataShown.size();
-				++col, ++bytePos)
+			for (int col = 0, x_pos = x;
+				col < bytesPerLine() && relBytePos < _dataShownOnScreen.size();
+				++col, ++relBytePos, ++absBytePos)
 			{
+				// Draw breakpoint box on the left of byte
 				painter.fillRect(x_pos, pxPosY, _size_Width_BreakpointField, _size_Height_SingleLine, breakpointFieldColor());
+
+				BreakpointType brk = _breakpoints[absBytePos];
+				if (brk != BreakpointType::None)
+				{
+					QPixmap icon;
+					if (brk == BreakpointType::Read)
+					{
+						icon = QPixmap(":/BrkR");
+					}
+					else if (brk == BreakpointType::Write)
+					{
+						icon = QPixmap(":/BrkW");
+					}
+					else
+					{
+						icon = QPixmap(":/BrkRW");
+					}
+					painter.drawPixmap(x_pos + 1, pxPosY + 1, _size_Width_BreakpointField - 2, _size_Height_SingleLine - 2, icon);
+				}
+
 				x_pos += _size_Width_BreakpointField;
-				
 				box.moveLeft(x_pos);
+				
+				// Draw hex box and text
 				painter.fillRect(x_pos, pxPosY, _size_Width_HexAreaField, _size_Height_SingleLine, hexFieldColor());
-				painter.drawText(box, Qt::AlignLeft | Qt::AlignVCenter, _hexDataShown.mid(bytePos * 2, 2));
+				painter.drawText(box, Qt::AlignLeft | Qt::AlignVCenter, _hexDataShown.mid(relBytePos * 2, 2));
 				x_pos += _size_Width_HexAreaField;
 			}
 		}
@@ -384,20 +442,21 @@ void QHexEdit2::paintEvent(QPaintEvent* event)
 		QRect box;
 		box.setRect(x, 0, _size_Width_AsciiAreaField, _size_Height_SingleLine);
 		painter.setPen(Qt::white);
-		for(int row = 0, pxPosY = 0, bytePos = 0;
-			row < this->_rowsShown;
-			++row, pxPosY += _size_Height_SingleLine, bytePos += bytesPerLine())
+		int bytePos = 0;
+		for(int row = 0, pxPosY = 0;
+			row < this->_linesToShow;
+			++row, pxPosY += _size_Height_SingleLine)
 		{
 			box.moveTop(pxPosY);
 
-			for (int col = 0, bytePos = row * bytesPerLine(), x_pos = x;
-				col < bytesPerLine() && bytePos < _dataShown.size();
+			for (int col = 0, x_pos = x;
+				col < bytesPerLine() && bytePos < _dataShownOnScreen.size();
 				++col, ++bytePos)
 			{
 				box.moveLeft(x_pos);
 
-				QChar ch = (uchar) _dataShown.at(bytePos);
-				if (ch < ' ')
+				QChar ch = (uchar) _dataShownOnScreen.at(bytePos);
+				if (ch < ' ' || ch > 0x7F)
 					ch = '.';
 
 				painter.drawText(box, Qt::AlignLeft | Qt::AlignVCenter, ch);
@@ -422,7 +481,7 @@ bool QHexEdit2::focusNextPrevChild(bool next)
  */
 void QHexEdit2::onVerticalScrollBarUpdate()
 {
-
+	this->onResizeReposition();
 }
 
 void QHexEdit2::onHorizontalScrollBarUpdate()
@@ -432,42 +491,43 @@ void QHexEdit2::onHorizontalScrollBarUpdate()
 
 void QHexEdit2::onResizeReposition()
 {
-	auto vW = viewport()->width();
-	auto vH = viewport()->height();
-	_rowsCanShowOnScreen = viewport()->height() / _size_Height_SingleLine + 1;
-
-	_byteFirstShown = this->verticalScrollBar()->value() * bytesPerLine();
-	auto newByteLastShown = _byteFirstShown + (qint64)(_rowsCanShowOnScreen * bytesPerLine()) - 1;
-	if (newByteLastShown >= _chunks->size())
-		newByteLastShown = _chunks->size() - 1;
-
-	_rowsShown = (newByteLastShown - _byteFirstShown) / bytesPerLine();
+	int vW = viewport()->width();
+	int vH = viewport()->height();
+	int oldFirstLine = _firstLine;
+	int oldLinesToShow = _linesToShow;
+	_firstLine = verticalScrollBar()->value();
+	_linesToShow = vH / _size_Height_SingleLine + (vH % _size_Height_SingleLine > 0);
+	int linesLeft = _allLines - _firstLine;
+	if (_linesToShow > linesLeft)
+	{
+		_linesToShow = linesLeft;
+	}
 
 	horizontalScrollBar()->setRange(0, _size_Width_Overall - vW);
 	horizontalScrollBar()->setPageStep(vW);
 
-	if (newByteLastShown != _byteLastShown)
+	verticalScrollBar()->setRange(0, _allLines - (vH / _size_Height_SingleLine));
+	verticalScrollBar()->setPageStep(_linesToShow);
+	if (oldFirstLine != _firstLine || oldLinesToShow != _linesToShow)
 	{
-		_byteLastShown = newByteLastShown;
-
 		int rowsOverall = _chunks->size() / bytesPerLine() + 1;
-		verticalScrollBar()->setRange(0, 8);
-		verticalScrollBar()->setPageStep(1);
 
-		readBuffers();
+		this->updateShownBuffer();
 	}
 }
 
 void QHexEdit2::onSourceChanged()
 {
-	onResizeReposition();
+	_allLines = _chunks->size() / this->bytesPerLine() + (_chunks->size() % this->bytesPerLine() > 0);
+	_breakpoints.resize(_chunks->size(), BreakpointType::None);
+	this->onResizeReposition();
 	viewport()->update();
 }
 
-void QHexEdit2::readBuffers()
+void QHexEdit2::updateShownBuffer()
 {
-	_dataShown = _chunks->data(_byteFirstShown, _byteLastShown - _byteFirstShown + bytesPerLine() + 1, nullptr);
-	_hexDataShown = _dataShown.toHex();
+	_dataShownOnScreen = _chunks->data(_firstLine * this->bytesPerLine(), _linesToShow * this->bytesPerLine(), nullptr);
+	_hexDataShown = _dataShownOnScreen.toHex();
 }
 
 void QHexEdit2::recalculateMetricVariables()
@@ -493,6 +553,8 @@ void QHexEdit2::recalculateMetricVariables()
 	// Ascii area
 	_size_Width_AsciiAreaField = _size_Font.width();
 	_size_Width_AsciiAreaBox = bytesPerLine() * _size_Width_AsciiAreaField;
+
+	this->recalculateOverallWidth();
 }
 
 void QHexEdit2::recalculateOverallWidth()

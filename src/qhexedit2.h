@@ -1,9 +1,17 @@
 #pragma once
 
+#include "chunks.h"
+
 #include <qabstractscrollarea.h>
 #include <qpen.h>
 
-#include "chunks.h"
+enum class BreakpointType : uint8_t
+{
+	None = 0,
+	Read,
+	Write,
+	ReadWrite
+};
 
 class QHexEdit2 : public QAbstractScrollArea
 {
@@ -204,19 +212,11 @@ public:
 	~QHexEdit2();
 
 	bool setData(QIODevice& iODevice);
+	void setBreak(int pos);
 
 signals:
-	/*! Contains the address, where the cursor is located. */
-	void currentAddressChanged(qint64 address);
-
-	/*! Contains the size of the data to edit. */
-	//void currentSizeChanged(qint64 size);
-
-	/*! The signal is emitted every time, the data is changed. */
-	void dataChanged();
-
-	/*! The signal is emitted every time, the overwrite mode is changed. */
-	void overwriteModeChanged(bool state);
+	void onBreakpointClick(int addr);
+	void onBreakpointBreak(int addr);
 
 protected:
 	// Handle events
@@ -237,7 +237,7 @@ private:
 	void onSourceChanged();
 
 	// Other functions
-	void readBuffers();
+	void updateShownBuffer();
 	void recalculateMetricVariables();
 	void recalculateOverallWidth();
 	QString formatAddress(int address);
@@ -290,16 +290,20 @@ private:
 	/*
 	 * Painting helper variables
 	 */
-	int _rowsCanShowOnScreen; // Rows that can be shown on screen. Viewport height / single line height
-	int _rowsShown; // Rows that have to be shown on screen.
+	//int _rowsCanShowOnScreen; // Rows that can be shown on screen. Viewport height / single line height
+	//int _rowsShown; // Rows that have to be shown on screen.
 
 	/*
 	 * Other variables
 	 */
 	Chunks* _chunks;
-	int _byteFirstShown;
-	int _byteLastShown;
-	QByteArray _dataShown; // data in the current View
+	//int _byteFirstShown;
+	//int _byteLastShown;
+	int _firstLine;
+	int _allLines;
+	int _linesToShow;
+	QByteArray _dataShownOnScreen; // data in the current View
 	QByteArray _hexDataShown;
-	QBuffer _bufData;
+	QBuffer _buffer;
+	std::vector<BreakpointType> _breakpoints;
 };

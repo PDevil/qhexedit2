@@ -856,7 +856,7 @@ void QHexEdit::paintEvent(QPaintEvent *event)
         if (_addressArea)
         {
             QString address;
-            for (int row=0, pxPosY = _pxCharHeight; row <= (_dataShown.size()/_bytesPerLine); row++, pxPosY +=_pxCharHeight)
+            for (int row=0, pxPosY = _pxCharHeight; row <= (_dataShownOnScreen.size()/_bytesPerLine); row++, pxPosY +=_pxCharHeight)
             {
                 address = QString("%1").arg(_bPosFirst + row*_bytesPerLine + _addressOffset, _addrDigits, 16, QChar('0'));
 				painter.drawLine(0, pxPosY, 500, pxPosY);
@@ -875,7 +875,7 @@ void QHexEdit::paintEvent(QPaintEvent *event)
             int pxPosX = _pxPosAddrWidth  - pxOfsX;
             int pxPosAsciiX2 = _pxPosAsciiX  - pxOfsX;
             qint64 bPosLine = row * _bytesPerLine;
-            for (int colIdx = 0; ((bPosLine + colIdx) < _dataShown.size() && (colIdx < _bytesPerLine)); colIdx++)
+            for (int colIdx = 0; ((bPosLine + colIdx) < _dataShownOnScreen.size() && (colIdx < _bytesPerLine)); colIdx++)
             {
                 QColor c = viewport()->palette().color(QPalette::Base);
                 painter.setPen(colStandard);
@@ -910,7 +910,7 @@ void QHexEdit::paintEvent(QPaintEvent *event)
                 // render ascii value
                 if (_asciiArea)
                 {
-                    int ch = (uchar)_dataShown.at(bPosLine + colIdx);
+                    int ch = (uchar)_dataShownOnScreen.at(bPosLine + colIdx);
                     if ( ch < ' ' || ch > '~' )
                         ch = '.';
                     r.setRect(pxPosAsciiX2, pxPosY - _pxCharHeight + _pxSelectionSub, _pxCharWidth, _pxCharHeight);
@@ -947,7 +947,7 @@ void QHexEdit::paintEvent(QPaintEvent *event)
         {
             // every 2 hex there is 1 ascii
             int asciiPositionInShowData = hexPositionInShowData / 2;
-            int ch = (uchar)_dataShown.at(asciiPositionInShowData);
+            int ch = (uchar)_dataShownOnScreen.at(asciiPositionInShowData);
             if (ch < ' ' || ch > '~')
                 ch = '.';
             painter.drawText(_pxCursorX - pxOfsX, _pxCursorY, QChar(ch));
@@ -1100,7 +1100,7 @@ void QHexEdit::adjust()
     _bPosLast = _bPosFirst + (qint64)(_rowsShown * _bytesPerLine) - 1;
     if (_bPosLast >= _chunks->size())
         _bPosLast = _chunks->size() - 1;
-    readBuffers();
+    updateShownBuffer();
     setCursorPosition(_cursorPosition);
 }
 
@@ -1114,13 +1114,13 @@ void QHexEdit::dataChangedPrivate(int)
 void QHexEdit::refresh()
 {
     ensureVisible();
-    readBuffers();
+    updateShownBuffer();
 }
 
-void QHexEdit::readBuffers()
+void QHexEdit::updateShownBuffer()
 {
-    _dataShown = _chunks->data(_bPosFirst, _bPosLast - _bPosFirst + _bytesPerLine + 1, &_markedShown);
-    _hexDataShown = QByteArray(_dataShown.toHex());
+    _dataShownOnScreen = _chunks->data(_bPosFirst, _bPosLast - _bPosFirst + _bytesPerLine + 1, &_markedShown);
+    _hexDataShown = QByteArray(_dataShownOnScreen.toHex());
 }
 
 QString QHexEdit::toReadable(const QByteArray &ba)

@@ -351,13 +351,13 @@ private:
 
     // Private utility functions
     void init();
-    void readBuffers();
+    void updateShownBuffer();
     QString toReadable(const QByteArray &ba);
 
 private slots:
     void adjust();                              // recalc pixel positions
     void dataChangedPrivate(int idx=0);         // emit dataChanged() signal
-    void refresh();                             // ensureVisible() and readBuffers()
+    void refresh();                             // ensureVisible() and updateShownBuffer()
     void updateCursor();                        // update blinking cursor
 
 private:
@@ -411,7 +411,7 @@ private:
     qint64 _cursorPosition;                     // absolute position of cursor, 1 Byte == 2 tics
     QRect _cursorRect;                          // physical dimensions of cursor
     QByteArray _data;                           // QHexEdit's data, when setup with QByteArray
-    QByteArray _dataShown;                      // data in the current View
+    QByteArray _dataShownOnScreen;                      // data in the current View
     QByteArray _hexDataShown;                   // data in view, transformed to hex
     qint64 _lastEventSize;                      // size, which was emitted last time
     QByteArray _markedShown;                    // marked data in view
