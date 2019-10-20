@@ -1,0 +1,13 @@
+Leroy:
+- 1 podwójny łącznik
+- 3 pojedyncze łączniki
+- 3 podwójne gniazdka
+- Tester
+- woltomierz
+
+14.07.2019 - 2.5h - szukanie gotowych rozwiązań + analiza qhexedit
+15.07.2019 - 1h - analiza qhexedit
+16.07.2019 - 1.5h - analiza qhexedit + przepisywanie
+17.07.2019 - 0.5h
+18.07.2019 - 2.5h - remake qhexedit
+19.07.2019 - 0.5h
